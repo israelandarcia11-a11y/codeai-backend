@@ -11,16 +11,50 @@ app.use(express.json());
 
 app.post("/chat", async (req, res) => {
   try {
-    const { messages, model } = req.body;
-    console.log("Chat recibido - modelo:", model);
-    const completion = await groq.chat.completions.create({
-      model: model || "llama-3.3-70b-versatile",
-      messages
-    });
-    console.log("Groq respondió OK");
-    res.json(completion);
+    const { messages, model, useGemini } = req.body;
+
+    if (useGemini) {
+      const fetch = (await import("node-fetch")).default;
+      const key = process.env.GEMINI_API_KEY;
+
+      const geminiMessages = messages
+        .filter(m => m.role !== "system")
+        .map(m => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }]
+        }));
+
+      const systemPrompt = messages.find(m => m.role === "system")?.content || "";
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${key}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: geminiMessages
+          })
+        }
+      );
+
+      const data = await response.json();
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
+
+      res.json({
+        choices: [{ message: { content: reply } }]
+      });
+
+    } else {
+      const completion = await groq.chat.completions.create({
+        model: model || "llama-3.3-70b-versatile",
+        messages
+      });
+      res.json(completion);
+    }
+
   } catch (err) {
-    console.error("Groq error:", err.message);
+    console.error("Chat error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
