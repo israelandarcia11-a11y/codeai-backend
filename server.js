@@ -9,22 +9,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── CHAT ──
 app.post("/chat", async (req, res) => {
   try {
     const { messages, model } = req.body;
+    console.log("Chat recibido - modelo:", model);
     const completion = await groq.chat.completions.create({
       model: model || "llama-3.3-70b-versatile",
       messages
     });
+    console.log("Groq respondió OK");
     res.json(completion);
   } catch (err) {
-    console.error("Groq error:", err);
+    console.error("Groq error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── STRIPE ──
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.create({
@@ -43,12 +43,11 @@ app.post("/create-checkout-session", async (req, res) => {
     });
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe error:", err);
+    console.error("Stripe error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── PLAN ──
 app.get("/get-plan", (req, res) => {
   res.json({ plan: "free" });
 });
